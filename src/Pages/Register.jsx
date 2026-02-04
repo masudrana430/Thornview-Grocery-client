@@ -19,7 +19,7 @@ import { auth } from "../firebase/firebase.config";
 
 import Container from "../Components/Container";
 
-const apiBase = "http://localhost:5000";
+const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 const IMGBB_API_KEY = import.meta.env.VITE_IMGBB_KEY || "";
 
 function validatePassword(pwd) {

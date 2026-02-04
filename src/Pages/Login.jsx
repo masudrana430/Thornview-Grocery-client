@@ -16,7 +16,7 @@ import {
 } from "react-icons/fi";
 import Container from "../Components/Container";
 
-const apiBase = "http://localhost:5000";
+const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 export default function Login() {
   const { setUser, setLoading: setGlobalLoading } = useContext(AuthContext);
