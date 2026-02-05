@@ -19,6 +19,8 @@ import EmojiPicker from "emoji-picker-react";
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 const SOUND_KEY = "thomview_chat_sound_enabled";
 
+
+
 function playPing() {
   try {
     const AudioCtx = window.AudioContext || window.webkitAudioContext;

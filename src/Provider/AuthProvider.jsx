@@ -9,6 +9,8 @@ import {
   updateProfile,
 } from "firebase/auth";
 import { apiPost, clearToken } from "../services/api";
+import { connectSocket, disconnectSocket } from "../services/socket";
+
 
 export const AuthContext = createContext(null);
 
@@ -100,6 +102,21 @@ export default function AuthProvider({ children }) {
 
     return () => unsub();
   }, []);
+  
+
+  // ✅ manage socket connection based on sessionReady
+  useEffect(() => {
+  if (!sessionReady) {
+    disconnectSocket();
+    return;
+  }
+
+  // ✅ sessionReady means token is stored in localStorage
+  connectSocket();
+
+  return () => disconnectSocket();
+}, [sessionReady]);
+
 
   return (
     <AuthContext.Provider
