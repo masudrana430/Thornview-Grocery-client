@@ -7,6 +7,7 @@ import { apiGet } from "../../services/api";
 import MegaMenu from "./MegaMenu";
 // import MegaMenu from "./MegaMenu";
 import SearchBox from "./SearchBox";
+import ThemeToggle from "../../Pages/Home/components/ThemeToggle";
 
 export default function Header() {
   const navigate = useNavigate();
@@ -134,6 +135,7 @@ export default function Header() {
                 </div>
               </div>
             </div>
+            <ThemeToggle />
 
             {/* Orders shortcut */}
             <Link to="/account/orders" className="btn btn-sm md:btn-md rounded-full">

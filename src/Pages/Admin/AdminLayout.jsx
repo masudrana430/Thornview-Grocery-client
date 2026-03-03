@@ -30,6 +30,8 @@ export default function AdminLayout() {
             <SideLink to="/admin/orders">Orders</SideLink>
             <SideLink to="/admin/products">Products</SideLink>
             <SideLink to="/admin/users">Users</SideLink>
+            <SideLink to="/admin/live-chat">Live Chat</SideLink>
+
           </div>
         </div>
       </aside>
