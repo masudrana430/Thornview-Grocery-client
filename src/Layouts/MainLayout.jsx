@@ -11,9 +11,10 @@ import ScrollToTop from "../Components/ScrollToTop";
 
 // ✅ Use your new global header component
 // If you named it Navbar, replace this line with: import Navbar from "../Components/Navbar";
-import Header from "../Components/Header/Header";
+import Header from "../Components/Header/HeaderWalmart";
 import TopUtilityBar from "../Components/Header/TopUtilityBar";
 import FloatingChatWidget from "../Components/Chat/FloatingChatWidget";
+import HeaderWalmart from "../Components/Header/HeaderWalmart";
 
 const MainLayout = () => {
   const { loading } = useApps();
@@ -33,28 +34,22 @@ const MainLayout = () => {
   }, [location.pathname]);
 
   return (
-    <div className="flex  flex-col bg-base-100 text-base-content">
+    <div className="min-h-screen flex flex-col bg-base-100 text-base-content ">
       <ScrollToTop />
-
       {/* ✅ Global Sticky Header */}
-      <header className="sticky top-0 z-50 border-b border-base-200 bg-base-100/85 backdrop-blur">
-        
-          
-          <Header />
-          <TopUtilityBar />
-        
-      </header>
-
+      <div className="sticky top-0 z-[99990]">
+        <HeaderWalmart />
+        <TopUtilityBar />
+      </div>
       {/* ✅ Main Content */}
-      <main id="main" className="flex-1">
-        {loading ? <LoadingSpinnerCopy /> : <Outlet />}
-      </main>
-
-      <FloatingChatWidget />   {/* ✅ global floating chat */}
-
-      {/* ✅ Footer */}
-      <Footer />
-
+      <div className="flex-1 overflow-x-hidden">
+        <main id="main" className="flex-1">
+          {loading ? <LoadingSpinnerCopy /> : <Outlet />}
+        </main>
+        <FloatingChatWidget /> {/* ✅ global floating chat */}
+        {/* ✅ Footer */}
+        <Footer />
+      </div>
       {/* ✅ Toasts live here, once for the whole app */}
       <ToastContainer
         position="top-right"

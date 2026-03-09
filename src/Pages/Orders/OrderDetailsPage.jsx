@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiGet } from "../../services/api";
 import Container from "../../Components/Container";
+import LoadingSpinner from "../../Components/LoadingSpinner";
 
 function money(n) {
   return `৳${Number(n || 0).toLocaleString()}`;
@@ -57,11 +58,11 @@ export default function OrderDetailsPage() {
   }, [order]);
 
   if (loading) {
+
     return (
-      <div className="rounded-2xl border border-base-200 bg-base-100 p-6">
-        <div className="font-bold text-lg">Loading order…</div>
-        <div className="text-sm text-slate-500 mt-2">Please wait.</div>
-      </div>
+      <Container>
+      <LoadingSpinner />
+      </Container>
     );
   }
 
