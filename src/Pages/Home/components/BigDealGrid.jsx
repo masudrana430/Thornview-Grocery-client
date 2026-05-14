@@ -1,302 +1,400 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useId, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import PromoTile from "./PromoTile";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
-/**
- * Premium BigDealGrid
- * - uses DB by default: GET /api/home/big-deals?slug=home
- * - still supports static itemsProp (fallback)
- * - upgrades UI without changing backend
- */
 export default function BigDealGrid({
   title = "This week’s highlights",
-  items: itemsProp, // optional; if not passed -> fetch from DB
+  items: itemsProp,
   slug = "home",
   className = "",
   viewAllHref = "/shop?deals=1",
   rightText = "View all",
-  eyebrow = "Curated deals", // ✅ new
 }) {
-  const [items, setItems] = useState(Array.isArray(itemsProp) ? itemsProp : []);
-  const [loading, setLoading] = useState(!Array.isArray(itemsProp));
+  const headingId = useId();
+  const hasItemsFromParent = Array.isArray(itemsProp);
+
+  const [items, setItems] = useState(
+    hasItemsFromParent ? normalizeItems(itemsProp) : []
+  );
+  const [loading, setLoading] = useState(!hasItemsFromParent);
   const [err, setErr] = useState("");
 
   useEffect(() => {
     if (Array.isArray(itemsProp)) {
-      setItems(itemsProp);
+      setItems(normalizeItems(itemsProp));
       setLoading(false);
+      setErr("");
       return;
     }
 
-    let mounted = true;
+    const controller = new AbortController();
 
-    async function load() {
+    async function loadBigDeals() {
       try {
         setLoading(true);
         setErr("");
 
-        const res = await fetch(`${API_BASE}/api/home/big-deals?slug=${slug}`, {
-          method: "GET",
-          headers: { "content-type": "application/json" },
-        });
+        const res = await fetch(
+          `${API_BASE}/api/home/big-deals?slug=${encodeURIComponent(slug)}`,
+          {
+            method: "GET",
+            headers: { "content-type": "application/json" },
+            signal: controller.signal,
+          }
+        );
 
         const json = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(json?.error?.message || "Failed to load big deals");
+
+        if (!res.ok) {
+          throw new Error(json?.error?.message || "Failed to load big deals");
+        }
 
         const incoming = json?.data?.items || json?.data || json;
-        const normalized = normalizeItems(incoming);
-
-        if (mounted) setItems(normalized);
-      } catch (e) {
-        if (mounted) setErr(e?.message || "Failed to load big deals");
+        setItems(normalizeItems(incoming));
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          setErr(error?.message || "Failed to load big deals");
+          setItems([]);
+        }
       } finally {
-        if (mounted) setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     }
 
-    load();
-    return () => {
-      mounted = false;
-    };
+    loadBigDeals();
+
+    return () => controller.abort();
   }, [itemsProp, slug]);
 
-  const content = useMemo(() => items || [], [items]);
+  const visibleItems = useMemo(() => items.slice(0, 5), [items]);
 
-  // Choose a “featured” tile (best: first, or the one with row-span-2)
-  const featuredId = useMemo(() => {
-    const found = content.find((x) => String(x.span || "").includes("row-span-2"));
-    return (found || content[0] || {})?.id;
-  }, [content]);
+  if (loading) {
+    return (
+      <section
+        className={className}
+        aria-labelledby={headingId}
+        aria-busy="true"
+      >
+        <SectionHeader
+          headingId={headingId}
+          title={title}
+          viewAllHref={viewAllHref}
+          rightText={rightText}
+        />
+        <BigDealSkeleton />
+      </section>
+    );
+  }
+
+  if (!visibleItems.length) {
+    return (
+      <section className={className} aria-labelledby={headingId}>
+        <SectionHeader
+          headingId={headingId}
+          title={title}
+          viewAllHref={viewAllHref}
+          rightText={rightText}
+        />
+
+        <div className="rounded-md border border-base-200 bg-base-100 p-5">
+          <p className="text-sm font-semibold text-error">
+            Big deals not available
+          </p>
+          <p className="mt-1 text-sm text-base-content/70">
+            {err || "No deal items found."}
+          </p>
+        </div>
+      </section>
+    );
+  }
 
   return (
-    <section className={className}>
-      <div className="rounded-[28px] border border-base-200 bg-base-100/75 backdrop-blur p-4 md:p-6 shadow-[0_22px_70px_-45px_rgba(0,0,0,0.55)]">
-        {/* Header */}
-        <div className="flex items-end justify-between gap-4 mb-5">
-          <div>
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-base-200/60 text-[11px] font-extrabold tracking-wide">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary" />
-              {eyebrow}
-            </div>
+    <section
+      className={className}
+      aria-labelledby={headingId}
+      itemScope
+      itemType="https://schema.org/ItemList"
+    >
+      <BigDealsJsonLd title={title} items={visibleItems} />
 
-            <h2 className="mt-3 text-xl md:text-3xl font-black leading-tight">
-              {title}
-            </h2>
+      <SectionHeader
+        headingId={headingId}
+        title={title}
+        viewAllHref={viewAllHref}
+        rightText={rightText}
+      />
 
-            <div className="mt-2 h-[3px] w-24 rounded-full bg-gradient-to-r from-primary/70 via-primary/30 to-transparent" />
-          </div>
-
-          <Link
-            to={viewAllHref}
-            className="btn btn-sm rounded-full bg-base-100 border border-base-200 hover:shadow-md"
-          >
-            {rightText}
-          </Link>
-        </div>
-
-        {loading ? (
-          <BigDealSkeleton />
-        ) : !content.length ? (
-          <div className="rounded-2xl border border-base-200 bg-base-100 p-6">
-            <p className="text-sm text-error font-semibold">Big deals not available</p>
-            <p className="mt-1 text-sm text-slate-500">
-              {err || "No items found. Insert a document in MongoDB and try again."}
-            </p>
-            <div className="mt-4 text-xs text-slate-500">
-              Try opening:{" "}
-              <span className="font-mono">
-                {API_BASE}/api/home/big-deals?slug={slug}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-12 gap-3 auto-rows-[115px] md:auto-rows-[155px] lg:auto-rows-[175px]">
-            {content.map((x) => {
-              const isFeatured = x.id === featuredId;
-
-              // Featured tiles get a premium overlay + CTA
-              if (isFeatured) {
-                return (
-                  <PremiumDealTile
-                    key={x.id}
-                    className={`${x.span} min-h-[160px]`}
-                    href={x.href}
-                    title={x.title}
-                    subtitle={x.subtitle}
-                    image={x.image}
-                    theme={x.theme}
-                    priceTag={x.priceTag}
-                    badge={x.sponsored ? "Sponsored" : x.badge}
-                    cta="Shop now"
-                  />
-                );
-              }
-
-              // Regular tiles continue using PromoTile (your existing component)
-              return (
-                <div
-                  key={x.id}
-                  className={[
-                    x.span,
-                    "rounded-[26px] overflow-hidden",
-                    "shadow-[0_14px_46px_-35px_rgba(0,0,0,0.55)]",
-                    "transition-transform duration-300 hover:-translate-y-[2px]",
-                  ].join(" ")}
-                >
-                  <PromoTile
-                    title={x.title}
-                    subtitle={x.subtitle}
-                    href={x.href}
-                    image={x.image}
-                    theme={x.theme}
-                    // If your PromoTile supports badge/eyebrow/cta/price later, it will use them
-                    badge={x.sponsored ? "Sponsored" : x.badge}
-                    className="rounded-[26px]" // ✅ requires PromoTile to accept className (recommended)
-                  />
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Non-blocking error note */}
-        {err && !loading ? (
-          <div className="mt-4 rounded-2xl border border-base-200 bg-base-100 p-3 text-sm">
-            <span className="text-warning font-semibold">Note:</span>{" "}
-            <span className="text-slate-600">{err}</span>
-          </div>
-        ) : null}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:auto-rows-[95px]">
+        {visibleItems.map((item, index) => (
+          <DealCard
+            key={item.id}
+            item={item}
+            index={index}
+            className={getDesktopLayout(index)}
+          />
+        ))}
       </div>
+
+      {err ? (
+        <p className="mt-4 rounded-md border border-base-200 bg-base-100 p-3 text-sm text-base-content/70">
+          <span className="font-semibold text-base-content">Note:</span> {err}
+        </p>
+      ) : null}
+
+      <noscript>
+        <p className="mt-4 rounded-md border border-base-200 bg-base-100 p-4 text-sm text-base-content/70">
+          Please enable JavaScript to view the latest deals.
+        </p>
+      </noscript>
     </section>
   );
 }
 
-function normalizeItems(items) {
-  if (!Array.isArray(items)) return [];
-  return items
-    .map((x = {}) => ({
-      id: String(x.id || x._id || Math.random().toString(16).slice(2)),
-      title: String(x.title || ""),
-      subtitle: String(x.subtitle || ""),
-      href: String(x.href || "/shop?deals=1"),
-      image: String(x.image || ""),
-      theme: String(x.theme || "neutral"),
-      priceTag: x.priceTag ? String(x.priceTag) : "",
-      span: String(x.span || "col-span-12 md:col-span-6 row-span-1"),
-      sponsored: Boolean(x.sponsored),
-      badge: x.badge ? String(x.badge) : "",
-    }))
-    .filter((x) => x.title || x.image);
+function SectionHeader({ headingId, title, viewAllHref, rightText }) {
+  return (
+    <div className="mb-3 flex items-center justify-between gap-4">
+      <h2
+        id={headingId}
+        className="text-base font-bold tracking-tight text-base-content md:text-lg"
+      >
+        {title}
+      </h2>
+
+      {viewAllHref ? (
+        <Link
+          to={viewAllHref}
+          className="rounded-full border border-base-300 bg-base-100 px-4 py-2 text-xs font-semibold text-base-content"
+        >
+          {rightText}
+        </Link>
+      ) : null}
+    </div>
+  );
 }
 
-/** Featured tile (premium look) */
-function PremiumDealTile({
-  className = "",
-  href = "/shop",
-  title,
-  subtitle,
-  image,
-  badge,
-  priceTag,
-  cta = "Shop",
-}) {
+function DealCard({ item, index, className = "" }) {
+  const isLeftLarge = index === 0;
+  const isRightTall = index === 4;
+  const isLarge = isLeftLarge || isRightTall;
+  const textColor = getTextColor(item);
+
   return (
-    <Link
-      to={href}
+    <article
       className={[
+        "relative overflow-hidden rounded-md border border-base-200 bg-base-100",
+        "min-h-[190px]",
         className,
-        "group relative isolate block overflow-hidden rounded-[28px] border border-base-200",
-        "shadow-[0_22px_70px_-48px_rgba(0,0,0,0.75)]",
-        "transition-transform duration-300 hover:-translate-y-[2px]",
       ].join(" ")}
+      itemProp="itemListElement"
+      itemScope
+      itemType="https://schema.org/ListItem"
     >
-      {/* Image */}
-      {image ? (
-        <img
-          src={image}
-          alt={title || "Deal"}
-          className="absolute inset-0 h-full w-full object-cover z-0 transition-transform duration-700 group-hover:scale-[1.04]"
-          loading="lazy"
-          decoding="async"
-        />
-      ) : (
-        <div className="absolute inset-0 bg-base-200" />
-      )}
+      <meta itemProp="position" content={String(index + 1)} />
+      <meta itemProp="name" content={item.title} />
+      <meta itemProp="url" content={item.href} />
 
-      {/* Overlays */}
-      <div className="absolute inset-0 z-10 bg-gradient-to-br from-black/60 via-black/18 to-transparent" />
-      <div className="absolute inset-0 z-10 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-[radial-gradient(circle_at_30%_20%,rgba(255,255,255,0.14),transparent_55%)]" />
+      <Link
+        to={item.href}
+        className="relative block h-full min-h-[190px] w-full focus:outline-none focus:ring-2 focus:ring-base-content/30"
+        aria-label={buildAriaLabel(item)}
+      >
+        {item.image ? (
+          <img
+            src={item.image}
+            alt={item.title || "Deal product image"}
+            className="absolute inset-0 h-full w-full object-cover"
+            loading={index === 0 ? "eager" : "lazy"}
+            fetchPriority={index === 0 ? "high" : "auto"}
+            decoding="async"
+            width={isLarge ? "640" : "420"}
+            height={isLarge ? "460" : "230"}
+            itemProp="image"
+          />
+        ) : (
+          <div className="absolute inset-0 bg-base-200" />
+        )}
 
-      {/* Content */}
-      <div className="relative z-20 h-full p-5 md:p-6 text-white flex flex-col justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            {badge ? (
-              <span className="inline-flex px-3 py-1 rounded-full bg-white/15 text-[11px] font-extrabold tracking-wide">
-                {badge}
-              </span>
+        <div className="absolute inset-0 bg-white/5" />
+
+        <div
+          className={[
+            "relative z-10 flex h-full flex-col p-4",
+            textColor,
+            isLarge ? "justify-between" : "justify-start",
+            isLeftLarge ? "md:p-5" : "",
+          ].join(" ")}
+        >
+          <div>
+            {item.subtitle ? (
+              <p
+                className={[
+                  "font-medium leading-tight",
+                  isLarge ? "text-sm" : "text-xs",
+                ].join(" ")}
+                itemProp="description"
+              >
+                {item.subtitle}
+              </p>
             ) : null}
 
-            {priceTag ? (
-              <span className="inline-flex px-3 py-1 rounded-full bg-white text-black text-[11px] font-extrabold">
-                {priceTag}
-              </span>
-            ) : null}
+            <h3
+              className={[
+                "mt-1 font-extrabold leading-tight tracking-tight",
+                isLeftLarge
+                  ? "max-w-[12ch] text-3xl md:text-5xl"
+                  : isRightTall
+                  ? "max-w-[13ch] text-2xl md:text-3xl"
+                  : "max-w-[13ch] text-lg md:text-2xl",
+              ].join(" ")}
+              itemProp="name"
+            >
+              {item.title}
+            </h3>
+
+            <span className="mt-3 inline-flex text-xs font-semibold underline underline-offset-2">
+              Shop
+            </span>
           </div>
 
-          <h3 className="mt-3 text-2xl md:text-3xl font-black leading-tight drop-shadow-sm">
-            {title}
-          </h3>
-          {subtitle ? (
-            <p className="mt-2 text-sm md:text-base text-white/85 max-w-[46ch]">
-              {subtitle}
-            </p>
-          ) : null}
-        </div>
+          {(item.badge || item.priceTag) && (
+            <div className="mt-4">
+              {item.badge ? (
+                <span className="inline-flex rounded-sm bg-red-600 px-2 py-1 text-xs font-bold text-white">
+                  {item.badge}
+                </span>
+              ) : null}
 
-        <div className="flex items-center gap-3">
-          <span className="btn btn-sm rounded-full border-0 bg-white text-black hover:bg-white shadow-sm">
-            {cta}
-          </span>
-          <span className="text-xs text-white/80">Free returns • Fast delivery</span>
+              {item.priceTag ? (
+                <p
+                  className={[
+                    "mt-1 font-black leading-none text-white",
+                    isLarge ? "text-5xl md:text-6xl" : "text-4xl",
+                  ].join(" ")}
+                >
+                  {item.priceTag}
+                </p>
+              ) : null}
+            </div>
+          )}
         </div>
-      </div>
-    </Link>
+      </Link>
+    </article>
   );
+}
+
+function getDesktopLayout(index) {
+  const layouts = [
+    // Big left card
+    "lg:col-start-1 lg:col-span-5 lg:row-start-1 lg:row-span-4 lg:min-h-[428px]",
+
+    // Middle top wide card
+    "lg:col-start-6 lg:col-span-4 lg:row-start-1 lg:row-span-2 lg:min-h-[206px]",
+
+    // Middle bottom left card
+    "lg:col-start-6 lg:col-span-2 lg:row-start-3 lg:row-span-2 lg:min-h-[206px]",
+
+    // Middle bottom right card
+    "lg:col-start-8 lg:col-span-2 lg:row-start-3 lg:row-span-2 lg:min-h-[206px]",
+
+    // Right tall card
+    "lg:col-start-10 lg:col-span-3 lg:row-start-1 lg:row-span-4 lg:min-h-[428px]",
+  ];
+
+  return layouts[index] || "lg:col-span-3 lg:row-span-2";
+}
+
+function normalizeItems(items) {
+  if (!Array.isArray(items)) return [];
+
+  return items
+    .map((item = {}, index) => {
+      const id = item.id || item._id || `${item.title || "deal"}-${index}`;
+
+      return {
+        id: String(id),
+        title: String(item.title || "").trim(),
+        subtitle: String(item.subtitle || "").trim(),
+        href: String(item.href || "/shop?deals=1"),
+        image: String(item.image || ""),
+        theme: String(item.theme || "light").toLowerCase(),
+        priceTag: item.priceTag ? String(item.priceTag).trim() : "",
+        sponsored: Boolean(item.sponsored),
+        badge: item.sponsored
+          ? "Sponsored"
+          : item.badge
+          ? String(item.badge).trim()
+          : "",
+      };
+    })
+    .filter((item) => item.title || item.image);
+}
+
+function getTextColor(item) {
+  if (
+    item.theme === "dark" ||
+    item.theme === "black" ||
+    item.theme === "image-dark"
+  ) {
+    return "text-white";
+  }
+
+  return "text-slate-950";
+}
+
+function buildAriaLabel(item) {
+  const parts = [item.title, item.subtitle, item.priceTag].filter(Boolean);
+  return parts.join(" - ") || "Shop deal";
 }
 
 function BigDealSkeleton() {
   return (
-    <div className="grid grid-cols-12 gap-3 auto-rows-[115px] md:auto-rows-[155px] lg:auto-rows-[175px]">
-      <Shimmer span="col-span-12 lg:col-span-6 row-span-2" />
-      <Shimmer span="col-span-12 lg:col-span-6 row-span-1" />
-      <Shimmer span="col-span-6 lg:col-span-3 row-span-1" />
-      <Shimmer span="col-span-6 lg:col-span-3 row-span-1" />
-      <Shimmer span="col-span-12 lg:col-span-3 row-span-2" />
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:auto-rows-[95px]">
+      <Skel className="lg:col-start-1 lg:col-span-5 lg:row-start-1 lg:row-span-4 lg:min-h-[428px]" />
+      <Skel className="lg:col-start-6 lg:col-span-4 lg:row-start-1 lg:row-span-2 lg:min-h-[206px]" />
+      <Skel className="lg:col-start-6 lg:col-span-2 lg:row-start-3 lg:row-span-2 lg:min-h-[206px]" />
+      <Skel className="lg:col-start-8 lg:col-span-2 lg:row-start-3 lg:row-span-2 lg:min-h-[206px]" />
+      <Skel className="lg:col-start-10 lg:col-span-3 lg:row-start-1 lg:row-span-4 lg:min-h-[428px]" />
     </div>
   );
 }
 
-function Shimmer({ span = "col-span-12", h = "min-h-[160px]" }) {
+function Skel({ className = "" }) {
   return (
     <div
       className={[
-        span,
-        h,
-        "rounded-[28px] border border-base-200 bg-base-100 overflow-hidden relative",
-        "shadow-[0_14px_46px_-35px_rgba(0,0,0,0.55)]",
+        "min-h-[190px] rounded-md border border-base-200 bg-base-200",
+        className,
       ].join(" ")}
     >
-      <div className="absolute inset-0 bg-base-200/70" />
-      <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.4s_infinite] bg-gradient-to-r from-transparent via-white/25 to-transparent" />
-      <style>{`
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-      `}</style>
+      <span className="sr-only">Loading deal</span>
     </div>
+  );
+}
+
+function BigDealsJsonLd({ title, items }) {
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: title,
+    itemListElement: items.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: item.title,
+      url: item.href,
+      image: item.image || undefined,
+      description: item.subtitle || undefined,
+    })),
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(data),
+      }}
+    />
   );
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import PromoTile from "./PromoTile";
 
@@ -6,6 +6,7 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import { Autoplay, Pagination } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/pagination";
+import Container from "../../../Components/Container";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
@@ -15,9 +16,9 @@ export default function PromoMosaic({ className = "" }) {
   const [err, setErr] = useState("");
 
   useEffect(() => {
-    let mounted = true;
+    const controller = new AbortController();
 
-    async function load() {
+    async function loadMosaic() {
       try {
         setLoading(true);
         setErr("");
@@ -25,170 +26,428 @@ export default function PromoMosaic({ className = "" }) {
         const res = await fetch(`${API_BASE}/api/home/mosaic?slug=home`, {
           method: "GET",
           headers: { "content-type": "application/json" },
+          signal: controller.signal,
         });
 
         const json = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(json?.error?.message || "Failed to load mosaic");
+
+        if (!res.ok) {
+          throw new Error(json?.error?.message || "Failed to load promo section");
+        }
 
         const doc = json?.data?.mosaic || json?.data || json;
-        if (!doc) throw new Error("Mosaic not found in response");
 
-        if (mounted) setMosaic(normalizeMosaic(doc));
-      } catch (e) {
-        if (mounted) setErr(e?.message || "Failed to load mosaic");
+        if (!doc) {
+          throw new Error("Promo content was not found");
+        }
+
+        setMosaic(normalizeMosaic(doc));
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          setErr(error?.message || "Failed to load promo section");
+        }
       } finally {
-        if (mounted) setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     }
 
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+    loadMosaic();
 
-  const content = useMemo(() => mosaic, [mosaic]);
+    return () => controller.abort();
+  }, []);
 
   if (loading) {
     return (
-      <section className={className}>
+      <section
+        className={className}
+        aria-label="Loading featured offers"
+        aria-busy="true"
+      >
         <MosaicSkeleton />
       </section>
     );
   }
 
-  if (!content) {
+  if (!mosaic) {
     return (
-      <section className={className}>
-        <div className="rounded-3xl border border-base-200/70 bg-base-100/80 backdrop-blur p-6 shadow-sm">
-          <p className="text-sm text-error font-semibold">Promo mosaic not available</p>
-          <p className="mt-1 text-sm opacity-70">
-            {err || "No mosaic doc found. Insert a document in MongoDB and try again."}
+      <section className={className} aria-label="Featured offers">
+        <div className="rounded-2xl border border-base-200 bg-base-100 p-5 shadow-sm">
+          <p className="text-sm font-semibold text-error">
+            Promo section is not available
           </p>
-          <div className="mt-4 text-xs opacity-70">
-            Try opening: <span className="font-mono">{API_BASE}/api/home/mosaic?slug=home</span>
-          </div>
+          <p className="mt-1 text-sm text-base-content/70">
+            {err || "No promo content found."}
+          </p>
         </div>
       </section>
     );
   }
 
   return (
-    <section className={className}>
-      {/* Premium frame (neutral, no primary/secondary bg gradients) */}
-      <div className="relative rounded-[28px] border border-base-200/70 bg-base-100/70 backdrop-blur-xl shadow-[0_18px_50px_rgba(0,0,0,0.10)]">
-        <div className="pointer-events-none absolute inset-0 rounded-[28px] ring-1 ring-white/10" />
+    <section
+      className={className}
+      aria-labelledby="featured-offers-title"
+      itemScope
+      itemType="https://schema.org/ItemList"
+    >
+      <JsonLd mosaic={mosaic} />
+      
+      <Container>
+      <div className="">
+        <div className="mb-4 flex items-end justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-base-content/60">
+              Featured
+            </p>
+            <h2
+              id="featured-offers-title"
+              className="text-2xl font-bold tracking-tight text-base-content md:text-3xl"
+            >
+              Today&apos;s best offers
+            </h2>
+          </div>
 
-        <div className="p-3 md:p-4">
-          {/* =========================
-              MOBILE / TABLET ( < lg )
-              Walmart-like quilt grid
-              ========================= */}
-          <div className="grid grid-cols-2 gap-3 md:gap-4 lg:hidden">
-            {/* HERO ALWAYS TOP */}
+          <Link
+            to="/shop"
+            className="hidden rounded-full border border-base-300 px-4 py-2 text-sm font-semibold transition hover:border-base-content hover:bg-base-200 focus:outline-none focus:ring-2 focus:ring-base-content/30 sm:inline-flex"
+          >
+            Shop all
+          </Link>
+        </div>
+
+        <div className="rounded-2xl border border-base-200 bg-base-100 p-3 shadow-sm md:p-4">
+          {/* Mobile and tablet */}
+          <div className="grid grid-cols-2 gap-3 lg:hidden">
             <div className="col-span-2">
-              <HeroSwiper slides={content.heroSlides || []} />
+              <HeroSwiper slides={mosaic.heroSlides} />
             </div>
 
-            {/* Left tall + 2 stacked right (Walmart-ish) */}
             <Tile className="row-span-2 min-h-[260px] md:min-h-[320px]">
-              <PromoTile {...content.leftTall} variant="tall" />
+              <PromoTile {...mosaic.leftTall} variant="tall" />
             </Tile>
 
-            <Tile className="min-h-[125px] md:min-h-[150px]">
-              <PromoTile {...content.rightTop} variant="card" />
+            <Tile className="min-h-[130px] md:min-h-[150px]">
+              <PromoTile {...mosaic.rightTop} variant="card" />
             </Tile>
 
-            <Tile className="min-h-[125px] md:min-h-[150px]">
-              <PromoTile {...content.rightMid} variant="card" />
+            <Tile className="min-h-[130px] md:min-h-[150px]">
+              <PromoTile {...mosaic.rightMid} variant="card" />
             </Tile>
 
-            {/* wide banner */}
-            <Tile className="col-span-2 min-h-[160px] md:min-h-[180px]">
-              <PromoTile {...content.midWide} variant="wide" />
+            <Tile className="col-span-2 min-h-[160px] md:min-h-[190px]">
+              <PromoTile {...mosaic.midWide} variant="wide" />
             </Tile>
 
-            {/* remaining promos as a clean 2-col grid */}
-            <Tile className="min-h-[160px] md:min-h-[180px]">
-              <PromoTile {...content.leftTop} variant="card" />
+            <Tile className="min-h-[165px] md:min-h-[190px]">
+              <PromoTile {...mosaic.leftTop} variant="card" />
             </Tile>
 
-            <Tile className="min-h-[160px] md:min-h-[180px]">
-              <PromoTile {...content.midLeft} variant="card" />
+            <Tile className="min-h-[165px] md:min-h-[190px]">
+              <PromoTile {...mosaic.midLeft} variant="card" />
             </Tile>
 
-            <Tile className="min-h-[160px] md:min-h-[180px]">
-              <PromoTile {...content.midRight} variant="card" />
+            <Tile className="min-h-[165px] md:min-h-[190px]">
+              <PromoTile {...mosaic.midRight} variant="card" />
             </Tile>
 
-            <Tile className="min-h-[160px] md:min-h-[180px]">
-              <PromoTile {...content.leftBottom} variant="card" />
+            <Tile className="min-h-[165px] md:min-h-[190px]">
+              <PromoTile {...mosaic.leftBottom} variant="card" />
             </Tile>
 
-            {/* optional: make rightTall full width on mobile for balance */}
             <Tile className="col-span-2 min-h-[240px] md:min-h-[300px]">
-              <PromoTile {...content.rightTall} variant="tall" />
+              <PromoTile {...mosaic.rightTall} variant="tall" />
             </Tile>
           </div>
 
-          {/* =========================
-              DESKTOP ( lg + )
-              Your original 3-column mosaic
-              ========================= */}
-          <div className="hidden lg:grid lg:grid-cols-12 gap-4">
-            {/* LEFT */}
+          {/* Desktop */}
+          <div className="hidden gap-4 lg:grid lg:grid-cols-12">
             <div className="lg:col-span-3 flex flex-col gap-4">
-              <Tile><PromoTile {...content.leftTop} variant="card" /></Tile>
-              <Tile className="min-h-[410px]"><PromoTile {...content.leftTall} variant="tall" /></Tile>
-              <Tile><PromoTile {...content.leftBottom} variant="card" /></Tile>
-            </div>
+              <Tile>
+                <PromoTile {...mosaic.leftTop} variant="card" />
+              </Tile>
 
-            {/* MIDDLE */}
-            <div className="lg:col-span-6 grid grid-cols-2 gap-4">
-              <HeroSwiper slides={content.heroSlides || []} />
-              <Tile><PromoTile {...content.midLeft} variant="card" /></Tile>
-              <Tile><PromoTile {...content.midRight} variant="card" /></Tile>
-              <Tile className="col-span-2">
-                <PromoTile {...content.midWide} variant="wide" />
+              <Tile className="min-h-[410px]">
+                <PromoTile {...mosaic.leftTall} variant="tall" />
+              </Tile>
+
+              <Tile>
+                <PromoTile {...mosaic.leftBottom} variant="card" />
               </Tile>
             </div>
 
-            {/* RIGHT */}
+            <div className="lg:col-span-6 grid grid-cols-2 gap-4">
+              <div className="col-span-2">
+                <HeroSwiper slides={mosaic.heroSlides} />
+              </div>
+
+              <Tile>
+                <PromoTile {...mosaic.midLeft} variant="card" />
+              </Tile>
+
+              <Tile>
+                <PromoTile {...mosaic.midRight} variant="card" />
+              </Tile>
+
+              <Tile className="col-span-2">
+                <PromoTile {...mosaic.midWide} variant="wide" />
+              </Tile>
+            </div>
+
             <div className="lg:col-span-3 flex flex-col gap-4">
-              <Tile><PromoTile {...content.rightTop} variant="card" /></Tile>
-              <Tile><PromoTile {...content.rightMid} variant="card" /></Tile>
-              <Tile className="min-h-[410px]"><PromoTile {...content.rightTall} variant="tall" /></Tile>
+              <Tile>
+                <PromoTile {...mosaic.rightTop} variant="card" />
+              </Tile>
+
+              <Tile>
+                <PromoTile {...mosaic.rightMid} variant="card" />
+              </Tile>
+
+              <Tile className="min-h-[410px]">
+                <PromoTile {...mosaic.rightTall} variant="tall" />
+              </Tile>
             </div>
           </div>
 
           {err ? (
-            <div className="mt-4 rounded-2xl border border-base-200/70 bg-base-100/70 backdrop-blur px-4 py-3 text-sm shadow-sm">
-              <span className="font-semibold">Note:</span>{" "}
-              <span className="opacity-70">{err}</span>
-            </div>
+            <p className="mt-4 rounded-xl border border-base-200 bg-base-100 px-4 py-3 text-sm text-base-content/70">
+              <span className="font-semibold text-base-content">Note:</span>{" "}
+              {err}
+            </p>
           ) : null}
         </div>
+
+        <noscript>
+          <p className="mt-4 rounded-xl border border-base-200 bg-base-100 p-4 text-sm">
+            Please enable JavaScript to view the latest featured offers.
+          </p>
+        </noscript>
       </div>
+      </Container>
     </section>
   );
 }
 
 function Tile({ children, className = "" }) {
   return (
-    <div
+    <article
       className={[
-        "group relative rounded-2xl overflow-hidden",
-        "border border-base-200/70 bg-base-100/85 backdrop-blur",
-        "shadow-sm",
-        "transition-all duration-200",
-        "hover:-translate-y-0.5 hover:shadow-[0_16px_40px_rgba(0,0,0,0.14)]",
-        "focus-within:ring-2 focus-within:ring-primary/35 focus-within:ring-offset-0",
+        "group relative overflow-hidden rounded-2xl border border-base-200 bg-base-100",
+        "shadow-sm transition duration-200 ease-out",
+        "hover:-translate-y-1 hover:border-base-content/20 hover:shadow-md",
+        "focus-within:border-base-content/30 focus-within:ring-2 focus-within:ring-base-content/20",
+        "motion-reduce:transition-none motion-reduce:hover:translate-y-0",
         className,
       ].join(" ")}
     >
-      <div className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 bg-white/5" />
       {children}
+    </article>
+  );
+}
+
+function HeroSwiper({ slides = [] }) {
+  const hasMultipleSlides = slides.length > 1;
+
+  if (!slides.length) {
+    return (
+      <div className="flex h-[220px] items-center justify-center rounded-2xl border border-base-200 bg-base-200 text-sm text-base-content/60 sm:h-[260px] md:h-[320px]">
+        No featured offers available
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl border border-base-200 bg-base-100 shadow-sm">
+      <Swiper
+        modules={[Autoplay, Pagination]}
+        autoplay={
+          hasMultipleSlides
+            ? { delay: 4000, disableOnInteraction: false, pauseOnMouseEnter: true }
+            : false
+        }
+        pagination={hasMultipleSlides ? { clickable: true } : false}
+        loop={hasMultipleSlides}
+        className="h-[220px] sm:h-[260px] md:h-[320px]"
+      >
+        {slides.map((slide, index) => {
+          const title = slide?.title || "Featured offer";
+          const subtitle = slide?.subtitle || "";
+          const href = slide?.href || "/shop";
+
+          return (
+            <SwiperSlide key={`${title}-${index}`}>
+              <Link
+                to={href}
+                className="group/hero relative block h-full w-full overflow-hidden focus:outline-none focus:ring-2 focus:ring-base-content/30"
+                aria-label={`${title}${subtitle ? ` - ${subtitle}` : ""}`}
+                itemProp="itemListElement"
+                itemScope
+                itemType="https://schema.org/ListItem"
+              >
+                <meta itemProp="position" content={String(index + 1)} />
+                <meta itemProp="url" content={href} />
+
+                {slide?.image ? (
+                  <img
+                    src={slide.image}
+                    alt={title}
+                    className="absolute inset-0 h-full w-full object-cover transition duration-300 group-hover/hero:scale-[1.03] motion-reduce:transition-none motion-reduce:group-hover/hero:scale-100"
+                    loading={index === 0 ? "eager" : "lazy"}
+                    fetchPriority={index === 0 ? "high" : "auto"}
+                    decoding="async"
+                    width="960"
+                    height="480"
+                  />
+                ) : (
+                  <div className="absolute inset-0 bg-base-200" />
+                )}
+
+                <div className="absolute inset-0 bg-black/35" />
+
+                <div className="relative flex h-full flex-col justify-between p-5 text-white md:p-6">
+                  <div>
+                    {slide?.badge ? (
+                      <span className="inline-flex rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-black">
+                        {slide.badge}
+                      </span>
+                    ) : null}
+
+                    <h3
+                      className="mt-3 max-w-xl text-2xl font-black leading-tight tracking-tight sm:text-3xl md:text-4xl"
+                      itemProp="name"
+                    >
+                      {title}
+                    </h3>
+
+                    {subtitle ? (
+                      <p className="mt-2 max-w-lg text-sm text-white/90 md:text-base">
+                        {subtitle}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex rounded-full bg-white px-4 py-2 text-sm font-bold text-black transition group-hover/hero:bg-base-200">
+                      {slide?.cta || "Shop now"}
+                    </span>
+
+                    {slide?.note ? (
+                      <span className="text-xs font-medium text-white/85">
+                        {slide.note}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </Link>
+            </SwiperSlide>
+          );
+        })}
+      </Swiper>
+
+      <style>{`
+        .swiper-pagination-bullets {
+          bottom: 12px !important;
+        }
+
+        .swiper-pagination-bullet {
+          width: 8px;
+          height: 8px;
+          opacity: 0.55;
+          background: rgba(255, 255, 255, 0.8);
+        }
+
+        .swiper-pagination-bullet-active {
+          opacity: 1;
+          transform: scale(1.15);
+        }
+      `}</style>
     </div>
+  );
+}
+
+function MosaicSkeleton() {
+  return (
+    <div className="mx-auto max-w-7xl rounded-2xl border border-base-200 bg-base-100 p-3 shadow-sm md:p-4">
+      <div className="mb-4 space-y-2">
+        <Skel h="h-4" className="w-24" />
+        <Skel h="h-8" className="w-64" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 lg:hidden">
+        <Skel h="h-[220px]" span />
+        <Skel h="h-[260px]" />
+        <Skel h="h-[130px]" />
+        <Skel h="h-[130px]" />
+        <Skel h="h-[160px]" span />
+        <Skel h="h-[165px]" />
+        <Skel h="h-[165px]" />
+        <Skel h="h-[165px]" />
+        <Skel h="h-[165px]" />
+        <Skel h="h-[240px]" span />
+      </div>
+
+      <div className="hidden gap-4 lg:grid lg:grid-cols-12">
+        <div className="lg:col-span-3 flex flex-col gap-4">
+          <Skel h="h-[190px]" />
+          <Skel h="h-[410px]" />
+          <Skel h="h-[190px]" />
+        </div>
+
+        <div className="lg:col-span-6 grid grid-cols-2 gap-4">
+          <Skel h="h-[320px]" span />
+          <Skel h="h-[190px]" />
+          <Skel h="h-[190px]" />
+          <Skel h="h-[170px]" span />
+        </div>
+
+        <div className="lg:col-span-3 flex flex-col gap-4">
+          <Skel h="h-[190px]" />
+          <Skel h="h-[190px]" />
+          <Skel h="h-[410px]" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Skel({ h = "h-40", span = false, className = "" }) {
+  return (
+    <div
+      className={[
+        "animate-pulse rounded-2xl bg-base-200",
+        h,
+        span ? "col-span-2" : "",
+        className,
+      ].join(" ")}
+    />
+  );
+}
+
+function JsonLd({ mosaic }) {
+  const slides = Array.isArray(mosaic?.heroSlides) ? mosaic.heroSlides : [];
+
+  const data = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "Featured offers",
+    itemListElement: slides.map((slide, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: slide?.title || "Featured offer",
+      url: slide?.href || "/shop",
+      image: slide?.image || undefined,
+      description: slide?.subtitle || undefined,
+    })),
+  };
+
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{
+        __html: JSON.stringify(data),
+      }}
+    />
   );
 }
 
@@ -205,137 +464,4 @@ function normalizeMosaic(doc) {
     rightMid: doc.rightMid || {},
     rightTall: doc.rightTall || {},
   };
-}
-
-function HeroSwiper({ slides = [] }) {
-  return (
-    <div className="col-span-2 relative rounded-2xl overflow-hidden border border-base-200/70 bg-base-100/80 backdrop-blur shadow-sm">
-      <Swiper
-        modules={[Autoplay, Pagination]}
-        autoplay={{ delay: 3500, disableOnInteraction: false }}
-        pagination={{ clickable: true }}
-        loop
-        className="h-[220px] sm:h-[260px] md:h-[320px] lg:h-[320px]"
-      >
-        {slides.map((s, idx) => (
-          <SwiperSlide key={idx}>
-            <Link to={s.href || "/shop"} className="relative block h-full w-full focus:outline-none">
-              {s?.image ? (
-                <img
-                  src={s.image}
-                  alt={s.title || "Promo"}
-                  className="absolute inset-0 h-full w-full object-cover"
-                  loading="lazy"
-                  decoding="async"
-                />
-              ) : (
-                <div className="absolute inset-0 bg-base-200" />
-              )}
-
-              {/* contrast overlay (ok; not the forbidden primary/secondary gradient) */}
-              <div className="absolute inset-0 bg-black/30" />
-              <div className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(0,0,0,.18),rgba(0,0,0,.55))]" />
-
-              <div className="relative h-full p-4 sm:p-5 md:p-6 text-white flex flex-col justify-between">
-                <div>
-                  {s.badge ? (
-                    <span className="inline-flex px-3 py-1.5 rounded-full bg-white/12 border border-white/15 text-[11px] font-extrabold tracking-wide">
-                      {s.badge}
-                    </span>
-                  ) : null}
-
-                  <h3 className="mt-3 text-2xl sm:text-3xl md:text-4xl font-black leading-tight">
-                    {s.title}
-                  </h3>
-
-                  {s.subtitle ? (
-                    <p className="mt-2 text-sm md:text-base text-white/85 max-w-lg">
-                      {s.subtitle}
-                    </p>
-                  ) : null}
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <span className="btn btn-sm rounded-full border border-white/15 bg-white text-black hover:bg-white shadow-sm">
-                    {s.cta || "Shop"}
-                  </span>
-                  {s.note ? <span className="text-xs text-white/80">{s.note}</span> : null}
-                </div>
-              </div>
-            </Link>
-          </SwiperSlide>
-        ))}
-      </Swiper>
-
-      <style>{`
-        .swiper-pagination-bullets { bottom: 12px !important; }
-        .swiper-pagination-bullet {
-          width: 8px; height: 8px;
-          opacity: .55;
-          border: 1px solid rgba(255,255,255,.35);
-          background: rgba(255,255,255,.25);
-          backdrop-filter: blur(6px);
-        }
-        .swiper-pagination-bullet-active {
-          opacity: 1;
-          transform: scale(1.15);
-          background: rgba(255,255,255,.9);
-        }
-      `}</style>
-    </div>
-  );
-}
-
-function MosaicSkeleton() {
-  return (
-    <div className="rounded-[28px] border border-base-200/70 bg-base-100/70 backdrop-blur-xl p-3 md:p-4 shadow-[0_18px_50px_rgba(0,0,0,0.10)]">
-      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:hidden">
-        <Skel h="h-[220px]" span />
-        <Skel h="h-[260px]" />
-        <Skel h="h-[125px]" />
-        <Skel h="h-[125px]" />
-        <Skel h="h-[160px]" span />
-        <Skel h="h-[160px]" />
-        <Skel h="h-[160px]" />
-        <Skel h="h-[160px]" />
-        <Skel h="h-[160px]" />
-        <Skel h="h-[240px]" span />
-      </div>
-
-      <div className="hidden lg:grid lg:grid-cols-12 gap-4">
-        <div className="lg:col-span-3 flex flex-col gap-4">
-          <Skel h="h-[190px]" />
-          <Skel h="h-[410px]" />
-          <Skel h="h-[190px]" />
-        </div>
-        <div className="lg:col-span-6 grid grid-cols-2 gap-4">
-          <Skel h="h-[320px]" span />
-          <Skel h="h-[190px]" />
-          <Skel h="h-[190px]" />
-          <Skel h="h-[170px]" span />
-        </div>
-        <div className="lg:col-span-3 flex flex-col gap-4">
-          <Skel h="h-[190px]" />
-          <Skel h="h-[190px]" />
-          <Skel h="h-[410px]" />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Skel({ h = "h-40", span = false }) {
-  return (
-    <div
-      className={[
-        "rounded-2xl border border-base-200/70 bg-base-100/70 overflow-hidden relative",
-        "shadow-sm animate-pulse",
-        h,
-        span ? "col-span-2" : "",
-      ].join(" ")}
-    >
-      <div className="absolute inset-0 bg-base-200/60" />
-      <div className="absolute inset-0 opacity-20 bg-white" />
-    </div>
-  );
 }
