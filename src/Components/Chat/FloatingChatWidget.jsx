@@ -12,13 +12,15 @@ import {
 } from "react-icons/fi";
 import { useAuth } from "../../Provider/AuthProvider";
 import EmojiPicker from "emoji-picker-react";
+import FixTextBox from "./FixTextBox";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 /** ✅ emit with ACK timeout */
 function sendMessageSocket(socket, payload, onAck) {
   if (!socket) return onAck?.({ ok: false, error: "NO_SOCKET" });
-  if (!socket.connected) return onAck?.({ ok: false, error: "SOCKET_DISCONNECTED" });
+  if (!socket.connected)
+    return onAck?.({ ok: false, error: "SOCKET_DISCONNECTED" });
 
   socket.timeout(8000).emit("message:send", payload, (err, ack) => {
     if (err) return onAck?.({ ok: false, error: "ACK_TIMEOUT" });
@@ -45,7 +47,10 @@ async function uploadAsset({ endpoint, file }) {
 function formatTime(iso) {
   if (!iso) return "";
   try {
-    return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return new Date(iso).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
   } catch {
     return "";
   }
@@ -95,7 +100,10 @@ export default function FloatingChatWidget() {
 
   const canChat = !!user && !!sessionReady;
 
-  const title = useMemo(() => (canChat ? "Support chat" : "Login to chat"), [canChat]);
+  const title = useMemo(
+    () => (canChat ? "Support chat" : "Login to chat"),
+    [canChat],
+  );
 
   function scrollToBottom(behavior = "smooth") {
     endRef.current?.scrollIntoView({ behavior });
@@ -120,7 +128,7 @@ export default function FloatingChatWidget() {
           ...m,
           _id: String(m._id || ""),
           conversationId: String(m.conversationId || cid),
-        }))
+        })),
       );
       setTimeout(() => scrollToBottom("auto"), 50);
     } finally {
@@ -153,17 +161,24 @@ export default function FloatingChatWidget() {
       if (!cid) return;
       if (cid !== String(convIdRef.current)) return;
 
-      const normalized = { ...message, _id: String(message._id || ""), conversationId: cid };
+      const normalized = {
+        ...message,
+        _id: String(message._id || ""),
+        conversationId: cid,
+      };
 
       setMessages((prev) => [...prev, normalized]);
 
-      const fromMe = String(normalized.senderId || "") === String(meIdRef.current);
+      const fromMe =
+        String(normalized.senderId || "") === String(meIdRef.current);
       if (!openRef.current && !fromMe) setUnread((n) => n + 1);
 
       setTimeout(() => scrollToBottom("smooth"), 20);
     });
 
-    s.on("connect_error", (e) => console.log("socket connect_error:", e?.message || e));
+    s.on("connect_error", (e) =>
+      console.log("socket connect_error:", e?.message || e),
+    );
 
     return () => {
       try {
@@ -205,7 +220,15 @@ export default function FloatingChatWidget() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
-  function addOptimistic({ type, text, fileUrl, fileName, mime, size, duration }) {
+  function addOptimistic({
+    type,
+    text,
+    fileUrl,
+    fileName,
+    mime,
+    size,
+    duration,
+  }) {
     const cid = String(conversationId || "");
     const tempId = `tmp_${Date.now()}_${Math.random().toString(16).slice(2)}`;
 
@@ -236,12 +259,14 @@ export default function FloatingChatWidget() {
         prev.map((m) =>
           m._id === tempId
             ? { ...m, failed: true, optimistic: false, error: ack?.error }
-            : m
-        )
+            : m,
+        ),
       );
       return;
     }
-    setMessages((prev) => prev.map((m) => (m._id === tempId ? ack.message : m)));
+    setMessages((prev) =>
+      prev.map((m) => (m._id === tempId ? ack.message : m)),
+    );
   }
 
   function sendText() {
@@ -261,7 +286,7 @@ export default function FloatingChatWidget() {
     sendMessageSocket(
       s,
       { conversationId: cid, type: "text", text: clean, tempId },
-      (ack) => finalizeOptimistic(tempId, ack)
+      (ack) => finalizeOptimistic(tempId, ack),
     );
   }
 
@@ -275,7 +300,10 @@ export default function FloatingChatWidget() {
       const s = socketRef.current;
       if (!cid || !s?.connected) return;
 
-      const up = await uploadAsset({ endpoint: "/api/uploads/chat-image", file });
+      const up = await uploadAsset({
+        endpoint: "/api/uploads/chat-image",
+        file,
+      });
 
       const tempId = addOptimistic({
         type: "image",
@@ -296,7 +324,7 @@ export default function FloatingChatWidget() {
           size: up.size,
           tempId,
         },
-        (ack) => finalizeOptimistic(tempId, ack)
+        (ack) => finalizeOptimistic(tempId, ack),
       );
     } catch (err) {
       console.error(err);
@@ -314,7 +342,10 @@ export default function FloatingChatWidget() {
       const s = socketRef.current;
       if (!cid || !s?.connected) return;
 
-      const up = await uploadAsset({ endpoint: "/api/uploads/chat-file", file });
+      const up = await uploadAsset({
+        endpoint: "/api/uploads/chat-file",
+        file,
+      });
 
       const tempId = addOptimistic({
         type: "file",
@@ -335,7 +366,7 @@ export default function FloatingChatWidget() {
           size: up.size,
           tempId,
         },
-        (ack) => finalizeOptimistic(tempId, ack)
+        (ack) => finalizeOptimistic(tempId, ack),
       );
     } catch (err) {
       console.error(err);
@@ -365,13 +396,18 @@ export default function FloatingChatWidget() {
         audioChunksRef.current = [];
 
         try {
-          const file = new File([blob], `voice_${Date.now()}.webm`, { type: "audio/webm" });
+          const file = new File([blob], `voice_${Date.now()}.webm`, {
+            type: "audio/webm",
+          });
 
           const cid = String(conversationId || "");
           const s = socketRef.current;
           if (!cid || !s?.connected) return;
 
-          const up = await uploadAsset({ endpoint: "/api/uploads/chat-audio", file });
+          const up = await uploadAsset({
+            endpoint: "/api/uploads/chat-audio",
+            file,
+          });
 
           const tempId = addOptimistic({
             type: "audio",
@@ -392,7 +428,7 @@ export default function FloatingChatWidget() {
               size: up.size,
               tempId,
             },
-            (ack) => finalizeOptimistic(tempId, ack)
+            (ack) => finalizeOptimistic(tempId, ack),
           );
         } catch (err) {
           console.error(err);
@@ -450,7 +486,9 @@ export default function FloatingChatWidget() {
               <div className="font-black truncate">{title}</div>
             </div>
             <div className="text-xs text-slate-500 mt-0.5">
-              {canChat ? "Typically replies in a few minutes" : "Please login first"}
+              {canChat
+                ? "Typically replies in a few minutes"
+                : "Please login first"}
             </div>
           </div>
 
@@ -485,8 +523,13 @@ export default function FloatingChatWidget() {
               const mine = String(m.senderId) === String(meId) || m.optimistic;
 
               return (
-                <div key={m._id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[82%] ${mine ? "items-end" : "items-start"} flex flex-col gap-1`}>
+                <div
+                  key={m._id}
+                  className={`flex ${mine ? "justify-end" : "justify-start"}`}
+                >
+                  <div
+                    className={`max-w-[82%] ${mine ? "items-end" : "items-start"} flex flex-col gap-1`}
+                  >
                     {/* Bubble */}
                     <div
                       className={[
@@ -551,9 +594,15 @@ export default function FloatingChatWidget() {
                     </div>
 
                     {/* Meta */}
-                    <div className={`text-[11px] opacity-70 flex items-center gap-2 ${mine ? "justify-end" : "justify-start"}`}>
+                    <div
+                      className={`text-[11px] opacity-70 flex items-center gap-2 ${mine ? "justify-end" : "justify-start"}`}
+                    >
                       <span>{formatTime(m.createdAt)}</span>
-                      {m.failed ? <span className="text-red-500 font-semibold">Failed</span> : null}
+                      {m.failed ? (
+                        <span className="text-red-500 font-semibold">
+                          Failed
+                        </span>
+                      ) : null}
                       {m.optimistic && !m.failed ? <span>Sending…</span> : null}
                     </div>
                   </div>
@@ -579,7 +628,13 @@ export default function FloatingChatWidget() {
             >
               <FiImage />
             </button>
-            <input ref={imgInputRef} type="file" accept="image/*" className="hidden" onChange={onPickImage} />
+            <input
+              ref={imgInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={onPickImage}
+            />
 
             <button
               className="btn btn-ghost btn-sm rounded-full hover:bg-base-200/60"
@@ -590,7 +645,12 @@ export default function FloatingChatWidget() {
             >
               <FiPaperclip />
             </button>
-            <input ref={fileInputRef} type="file" className="hidden" onChange={onPickFile} />
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={onPickFile}
+            />
 
             {!recording ? (
               <button
@@ -623,6 +683,11 @@ export default function FloatingChatWidget() {
           >
             😊
           </button>
+          <FixTextBox
+            value={text}
+            onChange={setText}
+            disabled={!canChat || !text.trim()}
+          />
         </div>
 
         {/* Emoji picker (anchored inside footer, no layout shift) */}
