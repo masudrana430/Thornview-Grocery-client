@@ -27,16 +27,17 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
-      VITE_STRIPE_PUBLISHABLE_KEY: ${{ vars.VITE_STRIPE_PUBLISHABLE_KEY }}
+  VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+  VITE_STRIPE_PUBLISHABLE_KEY: ${{ vars.VITE_STRIPE_PUBLISHABLE_KEY }}
+  VITE_IMGBB_KEY: ${{ vars.VITE_IMGBB_KEY }}
+  VITE_GOOGLE_MAPS_KEY: ${{ vars.VITE_GOOGLE_MAPS_KEY }}
 
-      # These names must match firebase.config.js exactly.
-      VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
-      VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
-      VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
-      VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
-      VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-      VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+  VITE_apiKey: ${{ vars.VITE_apiKey }}
+  VITE_authDomain: ${{ vars.VITE_authDomain }}
+  VITE_projectId: ${{ vars.VITE_projectId }}
+  VITE_storageBucket: ${{ vars.VITE_storageBucket }}
+  VITE_messagingSenderId: ${{ vars.VITE_messagingSenderId }}
+  VITE_appId: ${{ vars.VITE_appId }}
 
     steps:
       - name: Checkout repository
