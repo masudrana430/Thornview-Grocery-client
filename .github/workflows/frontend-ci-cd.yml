@@ -84,6 +84,11 @@ jobs:
 
       - name: Build Vite application
         run: npm run build
+      - name: Add deployment metadata
+        shell: bash
+        run: |
+          printf '{"commit":"%s"}\n' "$GITHUB_SHA" > dist/deploy-meta.json
+          cat dist/deploy-meta.json
 
       - name: Verify production build
         shell: bash
@@ -104,14 +109,55 @@ jobs:
           retention-days: 1
 
   deploy-production:
-    name: Deploy to Firebase Hosting
+      - name: Deploy to Firebase Hosting
+        id: firebase-deploy
+        continue-on-error: true
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_THOMVIEW_GROCERY }}
+          projectId: thomview-grocery
+          target: production
+          channelId: live
+          entryPoint: .
+
+      - name: Verify live deployment
+        shell: bash
+        run: |
+          DEPLOY_URL="https://thornview-grocery.web.app/deploy-meta.json"
+
+          echo "Expected commit: $GITHUB_SHA"
+          echo "Firebase action outcome: ${{ steps.firebase-deploy.outcome }}"
+
+          for attempt in {1..18}; do
+            RESPONSE="$(
+              curl \
+                --fail \
+                --silent \
+                --show-error \
+                --header "Cache-Control: no-cache" \
+                "${DEPLOY_URL}?timestamp=$(date +%s)" \
+                2>/dev/null || true
+            )"
+
+            echo "Verification attempt $attempt: $RESPONSE"
+
+            if echo "$RESPONSE" | grep --quiet "$GITHUB_SHA"; then
+              echo "Correct commit is live on Firebase Hosting."
+              exit 0
+            fi
+
+            sleep 5
+          done
+
+          echo "Deployment verification failed."
+          exit 1
     runs-on: ubuntu-latest
     needs:
       - frontend-ci
 
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
-    environment:
+  environment:
       name: production
       url: https://thornview-grocery.web.app
 
