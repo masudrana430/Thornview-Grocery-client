@@ -3,6 +3,14 @@
     "default": "thomview-grocery",
     "prod": "thomview-grocery"
   },
-  "targets": {},
+  "targets": {
+    "thomview-grocery": {
+      "hosting": {
+        "production": [
+          "thornview-grocery"
+        ]
+      }
+    }
+  },
   "etags": {}
 }

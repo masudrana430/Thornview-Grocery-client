@@ -1,6 +1,6 @@
 name: THORNVIEW Frontend CI/CD
 
-on:
+"on":
   pull_request:
     branches:
       - main
@@ -9,7 +9,7 @@ on:
     branches:
       - main
 
-  workflow_dispatch:
+  workflow_dispatch: {}
 
 concurrency:
   group: thornview-frontend-${{ github.workflow }}-${{ github.ref }}
@@ -19,9 +19,6 @@ permissions:
   contents: read
 
 jobs:
-  # =========================================================
-  # CONTINUOUS INTEGRATION
-  # =========================================================
   frontend-ci:
     name: Lint and Build Frontend
     runs-on: ubuntu-latest
@@ -29,21 +26,21 @@ jobs:
     env:
       VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
       VITE_STRIPE_PUBLISHABLE_KEY: ${{ vars.VITE_STRIPE_PUBLISHABLE_KEY }}
-
-      # These names must match firebase.config.js exactly.
-      VITE_FIREBASE_API_KEY: ${{ vars.VITE_FIREBASE_API_KEY }}
-      VITE_FIREBASE_AUTH_DOMAIN: ${{ vars.VITE_FIREBASE_AUTH_DOMAIN }}
-      VITE_FIREBASE_PROJECT_ID: ${{ vars.VITE_FIREBASE_PROJECT_ID }}
-      VITE_FIREBASE_STORAGE_BUCKET: ${{ vars.VITE_FIREBASE_STORAGE_BUCKET }}
-      VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.VITE_FIREBASE_MESSAGING_SENDER_ID }}
-      VITE_FIREBASE_APP_ID: ${{ vars.VITE_FIREBASE_APP_ID }}
+      VITE_IMGBB_KEY: ${{ vars.VITE_IMGBB_KEY }}
+      VITE_GOOGLE_MAPS_KEY: ${{ vars.VITE_GOOGLE_MAPS_KEY }}
+      VITE_apiKey: ${{ vars.VITE_apiKey }}
+      VITE_authDomain: ${{ vars.VITE_authDomain }}
+      VITE_projectId: ${{ vars.VITE_projectId }}
+      VITE_storageBucket: ${{ vars.VITE_storageBucket }}
+      VITE_messagingSenderId: ${{ vars.VITE_messagingSenderId }}
+      VITE_appId: ${{ vars.VITE_appId }}
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -54,6 +51,36 @@ jobs:
 
       - name: Run ESLint
         run: npm run lint
+
+      - name: Validate production variables
+        shell: bash
+        run: |
+          if [ -z "$VITE_API_BASE_URL" ]; then
+            echo "Missing repository variable: VITE_API_BASE_URL"
+            exit 1
+          fi
+
+          if [ -z "$VITE_STRIPE_PUBLISHABLE_KEY" ]; then
+            echo "Missing repository variable: VITE_STRIPE_PUBLISHABLE_KEY"
+            exit 1
+          fi
+
+          if [ -z "$VITE_apiKey" ]; then
+            echo "Missing repository variable: VITE_apiKey"
+            exit 1
+          fi
+
+          if [ -z "$VITE_projectId" ]; then
+            echo "Missing repository variable: VITE_projectId"
+            exit 1
+          fi
+
+          if [[ "$VITE_API_BASE_URL" != https://* ]]; then
+            echo "VITE_API_BASE_URL must use HTTPS"
+            exit 1
+          fi
+
+          echo "Required production variables are configured."
 
       - name: Build Vite application
         run: npm run build
@@ -69,20 +96,16 @@ jobs:
           echo "Production build verified successfully."
 
       - name: Upload verified build
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: thornview-frontend-dist
           path: dist
           if-no-files-found: error
           retention-days: 1
 
-  # =========================================================
-  # CONTINUOUS DEPLOYMENT
-  # =========================================================
   deploy-production:
     name: Deploy to Firebase Hosting
     runs-on: ubuntu-latest
-
     needs:
       - frontend-ci
 
@@ -90,14 +113,14 @@ jobs:
 
     environment:
       name: production
-      url: https://thomview-grocery.web.app
+      url: https://thornview-grocery.web.app
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v4
 
       - name: Download verified build
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: thornview-frontend-dist
           path: dist
@@ -110,9 +133,13 @@ jobs:
             exit 1
           fi
 
+          echo "Verified artifact is ready for deployment."
+
       - name: Deploy to Firebase Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_THOMVIEW_GROCERY }}
+          projectId: thomview-grocery
+          target: production
           channelId: live
           entryPoint: .
