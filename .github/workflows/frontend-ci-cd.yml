@@ -84,6 +84,7 @@ jobs:
 
       - name: Build Vite application
         run: npm run build
+
       - name: Add deployment metadata
         shell: bash
         run: |
@@ -93,10 +94,15 @@ jobs:
       - name: Verify production build
         shell: bash
         run: |
-          if [ ! -f "dist/index.html" ]; then
+          test -f dist/index.html || {
             echo "Error: dist/index.html was not generated."
             exit 1
-          fi
+          }
+
+          test -f dist/deploy-meta.json || {
+            echo "Error: dist/deploy-meta.json was not generated."
+            exit 1
+          }
 
           echo "Production build verified successfully."
 
@@ -109,6 +115,42 @@ jobs:
           retention-days: 1
 
   deploy-production:
+    name: Deploy to Firebase Hosting
+    runs-on: ubuntu-latest
+    needs:
+      - frontend-ci
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    environment:
+      name: production
+      url: https://thornview-grocery.web.app
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download verified build
+        uses: actions/download-artifact@v4
+        with:
+          name: thornview-frontend-dist
+          path: dist
+
+      - name: Verify downloaded build
+        shell: bash
+        run: |
+          test -f dist/index.html || {
+            echo "Error: verified frontend artifact is missing."
+            exit 1
+          }
+
+          test -f dist/deploy-meta.json || {
+            echo "Error: deployment metadata is missing."
+            exit 1
+          }
+
+          echo "Verified artifact is ready for deployment."
+
       - name: Deploy to Firebase Hosting
         id: firebase-deploy
         continue-on-error: true
@@ -150,42 +192,5 @@ jobs:
           done
 
           echo "Deployment verification failed."
+          echo "The expected commit was not found on the live website."
           exit 1
-    runs-on: ubuntu-latest
-    needs:
-      - frontend-ci
-
-  if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-
-  environment:
-      name: production
-      url: https://thornview-grocery.web.app
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Download verified build
-        uses: actions/download-artifact@v4
-        with:
-          name: thornview-frontend-dist
-          path: dist
-
-      - name: Verify downloaded build
-        shell: bash
-        run: |
-          if [ ! -f "dist/index.html" ]; then
-            echo "Error: verified frontend artifact is missing."
-            exit 1
-          fi
-
-          echo "Verified artifact is ready for deployment."
-
-      - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_THOMVIEW_GROCERY }}
-          projectId: thomview-grocery
-          target: production
-          channelId: live
-          entryPoint: .
