@@ -90,7 +90,7 @@ jobs:
 
     environment:
       name: production
-      url: https://thomview-grocery.web.app
+      url: https://thornview-grocery.web.app
 
     steps:
       - name: Checkout repository
@@ -111,8 +111,10 @@ jobs:
           fi
 
       - name: Deploy to Firebase Hosting
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_THOMVIEW_GROCERY }}
-          channelId: live
-          entryPoint: .
+  uses: FirebaseExtended/action-hosting-deploy@v0
+  with:
+    firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_THOMVIEW_GROCERY }}
+    projectId: thomview-grocery
+    target: production
+    channelId: live
+    entryPoint: .
