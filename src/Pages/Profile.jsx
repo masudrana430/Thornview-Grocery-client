@@ -1,13 +1,13 @@
-import React, { useContext, useEffect, useState, useMemo } from "react";
+import React, {useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import Container from "../Components/Container";
-import { AuthContext } from "../Provider/AuthProvider";
+import { useAuth } from "../hooks/useAuth";
 import Lottie from "lottie-react";
 import { FiUser, FiImage, FiMail } from "react-icons/fi";
 import Login from "./../animation/Secure Login.json";
 
 const Profile = () => {
-  const { user, updateUser } = useContext(AuthContext);
+  const { user, updateUser } = useAuth();
   const [name, setName] = useState("");
   const [photoUrl, setPhotoUrl] = useState("");
   const [loading, setLoading] = useState(false);

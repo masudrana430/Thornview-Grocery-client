@@ -1,6 +1,4 @@
-// src/Provider/AuthProvider.jsx
-import React, { createContext, useContext, useEffect, useRef, useState } from "react";
-import { auth } from "../firebase/firebase.config";
+import { useEffect, useRef, useState } from "react";
 import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
@@ -8,129 +6,183 @@ import {
   signOut,
   updateProfile,
 } from "firebase/auth";
+
+import { auth } from "../firebase/firebase.config";
+import { AuthContext } from "../context/AuthContext";
 import { apiPost, clearToken } from "../services/api";
-import { connectSocket, disconnectSocket } from "../services/socket";
-
-
-export const AuthContext = createContext(null);
-
-export function useAuth() {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used inside <AuthProvider />");
-  return ctx;
-}
+import {
+  connectSocket,
+  disconnectSocket,
+} from "../services/socket";
 
 export default function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-
-  // ✅ loading true until session is ready (cookies + token)
   const [loading, setLoading] = useState(true);
   const [sessionReady, setSessionReady] = useState(false);
 
+  // Prevents duplicate backend session creation for the same Firebase user.
   const lastUidRef = useRef(null);
 
   const createUser = async (email, password) => {
     setLoading(true);
-    return createUserWithEmailAndPassword(auth, email, password);
+
+    try {
+      return await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+    } catch (error) {
+      setLoading(false);
+      throw error;
+    }
   };
 
   const signIn = async (email, password) => {
     setLoading(true);
-    return signInWithEmailAndPassword(auth, email, password);
+
+    try {
+      return await signInWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+    } catch (error) {
+      setLoading(false);
+      throw error;
+    }
   };
 
   const updateUser = async (updatedData) => {
-    if (!auth.currentUser) return;
+    if (!auth.currentUser) {
+      throw new Error("No authenticated user found");
+    }
+
     await updateProfile(auth.currentUser, updatedData);
+
+    // Firebase mutates currentUser, so copy it to trigger a React update.
     setUser({ ...auth.currentUser });
   };
 
   const logOut = async () => {
     setLoading(true);
+
     try {
       try {
         await apiPost("/api/auth/logout", {});
-      } catch (_) {}
+      } catch (error) {
+        console.error("Backend logout failed:", error);
+      }
+
       await signOut(auth);
+    } catch (error) {
+      console.error("Firebase logout failed:", error);
+      throw error;
     } finally {
       setUser(null);
       setSessionReady(false);
       lastUidRef.current = null;
-      clearToken(); // ✅ remove local accessToken
+      clearToken();
+      disconnectSocket();
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      setSessionReady(false);
-
-      if (!currentUser) {
-        lastUidRef.current = null;
-        clearToken(); // ✅ no user => no token
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-
-      if (lastUidRef.current === currentUser.uid) {
-        setSessionReady(true);
-        setLoading(false);
-        return;
-      }
-      lastUidRef.current = currentUser.uid;
-
-      try {
-        const firebaseIdToken = await currentUser.getIdToken(); // ok
-        const loginRes = await apiPost("/api/auth/login", { firebaseIdToken });
-
-        // ✅ VERY IMPORTANT: store accessToken returned by backend
-        const accessToken = loginRes?.data?.accessToken;
-        if (accessToken) localStorage.setItem("accessToken", accessToken);
-
-        setSessionReady(true);
-      } catch (err) {
-        console.error("Backend session bootstrap failed:", err);
+    const unsubscribe = onAuthStateChanged(
+      auth,
+      async (currentUser) => {
+        setUser(currentUser);
         setSessionReady(false);
-        clearToken();
-      } finally {
-        setLoading(false);
+
+        if (!currentUser) {
+          lastUidRef.current = null;
+          clearToken();
+          setLoading(false);
+          return;
+        }
+
+        setLoading(true);
+
+        // Avoid creating the same backend session multiple times.
+        if (lastUidRef.current === currentUser.uid) {
+          setSessionReady(true);
+          setLoading(false);
+          return;
+        }
+
+        lastUidRef.current = currentUser.uid;
+
+        try {
+          const firebaseIdToken =
+            await currentUser.getIdToken();
+
+          const loginResponse = await apiPost(
+            "/api/auth/login",
+            {
+              firebaseIdToken,
+            }
+          );
+
+          const accessToken =
+            loginResponse?.data?.accessToken;
+
+          if (!accessToken) {
+            throw new Error(
+              "Backend login did not return an access token"
+            );
+          }
+
+          localStorage.setItem(
+            "accessToken",
+            accessToken
+          );
+
+          setSessionReady(true);
+        } catch (error) {
+          console.error(
+            "Backend session bootstrap failed:",
+            error
+          );
+
+          lastUidRef.current = null;
+          setSessionReady(false);
+          clearToken();
+        } finally {
+          setLoading(false);
+        }
       }
-    });
+    );
 
-    return () => unsub();
+    return unsubscribe;
   }, []);
-  
 
-  // ✅ manage socket connection based on sessionReady
   useEffect(() => {
-  if (!sessionReady) {
-    disconnectSocket();
-    return;
-  }
+    if (!sessionReady) {
+      disconnectSocket();
+      return undefined;
+    }
 
-  // ✅ sessionReady means token is stored in localStorage
-  connectSocket();
+    connectSocket();
 
-  return () => disconnectSocket();
-}, [sessionReady]);
+    return () => {
+      disconnectSocket();
+    };
+  }, [sessionReady]);
 
+  const authValue = {
+    user,
+    loading,
+    sessionReady,
+    createUser,
+    signIn,
+    logOut,
+    setUser,
+    updateUser,
+  };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        sessionReady,
-        createUser,
-        signIn,
-        logOut,
-        setUser,
-        updateUser,
-      }}
-    >
+    <AuthContext.Provider value={authValue}>
       {children}
     </AuthContext.Provider>
   );

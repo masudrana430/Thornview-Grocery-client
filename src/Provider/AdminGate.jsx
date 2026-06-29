@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { apiGet } from "../services/api";
-import { useAuth } from "./AuthProvider";
+import { useAuth } from "../hooks/useAuth";
 
 export default function AdminGate({ children, allow = ["admin", "manager"] }) {
   const { user, loading: authLoading, sessionReady } = useAuth();

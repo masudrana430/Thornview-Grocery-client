@@ -1,6 +1,6 @@
 // src/Provider/AppProviders.jsx
 import React from "react";
-import { useAuth } from "./AuthProvider";
+import { useAuth } from "../hooks/useAuth";
 import CartProvider from "./CartProvider";
 
 function CartGate({ children }) {

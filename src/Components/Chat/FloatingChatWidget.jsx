@@ -12,7 +12,7 @@ import {
   FiArrowDown,
   FiCheckCircle,
 } from "react-icons/fi";
-import { useAuth } from "../../Provider/AuthProvider";
+import { useAuth } from "../../hooks/useAuth";
 import EmojiPicker from "emoji-picker-react";
 import FixTextBox from "./FixTextBox";
 import AudioMessagePlayer from "./AudioMessagePlayer";

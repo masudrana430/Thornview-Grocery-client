@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { useCart } from "../../context/CartContext";
+import { useCart } from "../../hooks/useCart";
 import Container from "../../Components/Container";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";

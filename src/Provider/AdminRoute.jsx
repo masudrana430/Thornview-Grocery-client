@@ -1,7 +1,7 @@
 // src/routes/AdminRoute.jsx
 import React, { useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
-import { useAuth } from "../Provider/AuthProvider";
+import { useAuth } from "../hooks/useAuth";
 import { apiGet } from "../services/api";
 
 export default function AdminRoute({ children, allow = ["admin", "manager"] }) {

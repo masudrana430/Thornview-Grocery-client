@@ -1,9 +1,9 @@
-import React, { useContext } from "react";
+import React from "react";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
-import { AuthContext } from "../Provider/AuthProvider";
+import { useAuth } from "../hooks/useAuth";
 
 export default function RequireAuth() {
-  const { user, initializing } = useContext(AuthContext);
+  const { user, initializing } = useAuth();
   const location = useLocation();
 
   if (initializing) return <div className="p-6">Loading…</div>;

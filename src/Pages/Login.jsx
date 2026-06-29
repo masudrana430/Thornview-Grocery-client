@@ -1,8 +1,8 @@
 // src/pages/Login.jsx
-import React, { useContext, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
-import { AuthContext } from "../Provider/AuthProvider";
+import { useAuth } from "../hooks/useAuth";
 import { auth } from "../firebase/firebase.config";
 import {
   FiEye,
@@ -23,7 +23,7 @@ const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 // >>>>>>> 7ced122 (WIP:)
 
 export default function Login() {
-  const { setUser, setLoading: setGlobalLoading } = useContext(AuthContext);
+  const { setUser, setLoading: setGlobalLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 

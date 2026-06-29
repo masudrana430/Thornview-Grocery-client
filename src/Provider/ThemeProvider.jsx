@@ -1,20 +1,21 @@
-import React, { createContext, useEffect, useMemo, useState } from "react";
-
-export const ThemeContext = createContext(null);
+import { useEffect, useMemo, useState } from "react";
+import { ThemeContext } from "../context/ThemeContext";
 
 const THEME_KEY = "bloodcare_theme";
-const DEFAULT_THEME = "light"; // or "dark"
+const DEFAULT_THEME = "light";
 
 const ThemeProvider = ({ children }) => {
-  const [theme, setTheme] = useState(DEFAULT_THEME);
+  const [theme, setTheme] = useState(() => {
+    const savedTheme = localStorage.getItem(THEME_KEY);
 
-  // Load saved theme on first mount
-  useEffect(() => {
-    const saved = localStorage.getItem(THEME_KEY);
-    if (saved) setTheme(saved);
-  }, []);
+    // Prevent invalid values from being used as a theme.
+    if (savedTheme === "light" || savedTheme === "dark") {
+      return savedTheme;
+    }
 
-  // Apply theme to <html data-theme="...">
+    return DEFAULT_THEME;
+  });
+
   useEffect(() => {
     document.documentElement.setAttribute("data-theme", theme);
     localStorage.setItem(THEME_KEY, theme);
@@ -24,13 +25,23 @@ const ThemeProvider = ({ children }) => {
     () => ({
       theme,
       setTheme,
-      toggleTheme: () => setTheme((t) => (t === "light" ? "dark" : "light")),
+
+      toggleTheme: () => {
+        setTheme((currentTheme) =>
+          currentTheme === "light" ? "dark" : "light"
+        );
+      },
+
       isDark: theme === "dark",
     }),
     [theme]
   );
 
-  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>
+      {children}
+    </ThemeContext.Provider>
+  );
 };
 
 export default ThemeProvider;

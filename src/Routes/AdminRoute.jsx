@@ -1,7 +1,7 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
 import useMe from "../hooks/useMe";
-import { useAuth } from "../Provider/AuthProvider";
+import { useAuth } from "../hooks/useAuth";
 
 export default function AdminRoute({ children, allow = ["admin", "manager"] }) {
   const { user, loading: authLoading } = useAuth();

@@ -1,12 +1,11 @@
 // src/Pages/ForgotPassword.jsx
-import React, { useContext, useEffect, useState } from "react";
+import React, {  useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { AuthContext } from "../Provider/AuthProvider";
-
+import { useAuth } from "../hooks/useAuth";
 
 export default function ForgotPassword() {
   const location = useLocation();
-  const { user } = useContext(AuthContext);
+  const { user } = useAuth();
 
   const emailFromState = location.state?.email || "";
   const emailFromQuery = new URLSearchParams(location.search).get("email") || "";

@@ -1,13 +1,13 @@
 import axios from "axios";
-import { useContext, useEffect } from "react";
-import { AuthContext } from "../Provider/AuthProvider";
+import { useEffect } from "react";
+import { useAuth } from "../hooks/useAuth";
 
 const axiosSecure = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:5000",
 });
 
 const useAxiosSecure = () => {
-  const { user } = useContext(AuthContext);
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!user) return;

@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { useCart } from "../context/CartContext";
+import { useCart } from "../hooks/useCart";
 
 export default function CartDrawer({ open, onClose }) {
   const { cart, setQty, removeFromCart } = useCart();

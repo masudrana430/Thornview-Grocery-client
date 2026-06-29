@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import useCart from "../../hooks/useCart";
+import { useCart } from "../../hooks/useCart";
 import Container from "../../Components/Container";
 
 export default function CartPage() {

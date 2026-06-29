@@ -86,7 +86,7 @@ export default function AddAddressModal({ open, onClose, onSaved, initialName = 
       },
       { enableHighAccuracy: true, timeout: 8000 }
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [open]);
 
   async function handleSave() {

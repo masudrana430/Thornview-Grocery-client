@@ -1,10 +1,10 @@
-import { useContext, useEffect, useState } from "react";
-import { AuthContext } from "../Provider/AuthProvider";
+import {useEffect, useState } from "react";
+import { useAuth } from "../hooks/useAuth";
 
 const API_BASE =  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
 
 const useCurrentUser = () => {
-  const { user } = useContext(AuthContext);
+  const { user } = useAuth();
   const [dbUser, setDbUser] = useState(null);
   const [loadingDbUser, setLoadingDbUser] = useState(true);
   const [error, setError] = useState("");

@@ -12,8 +12,8 @@ import {
   FiShield,
   FiMapPin,
 } from "react-icons/fi";
-import { AuthContext } from "../../Provider/AuthProvider";
-import { CartContext } from "../../Provider/CartProvider";
+import { useAuth } from "../../hooks/useAuth";
+import { CartContext } from "../../context/CartContext";
 import { apiGet } from "../../services/api";
 import MegaMenu from "./MegaMenu";
 import SearchBox from "./SearchBox";
@@ -23,7 +23,7 @@ import ThemeToggle from "../../Pages/Home/components/ThemeToggle";
 export default function HeaderWalmart() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logOut } = useContext(AuthContext);
+  const { user, logOut } = useAuth();
   const { cartCount } = useContext(CartContext);
 
   const [categories, setCategories] = useState([]);

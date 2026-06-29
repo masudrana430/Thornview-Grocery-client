@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { apiGet } from "../../services/api";
-import { useAuth } from "../../Provider/AuthProvider";
+import { useAuth } from "../../hooks/useAuth";
 import {
   FiSearch,
   FiSend,
@@ -40,7 +40,9 @@ function playPing() {
       o.stop();
       ctx.close();
     }, 90);
-  } catch {}
+  } catch (error) {
+  console.error("Failed to play ping sound:", error);
+}
 }
 
 function safeDate(v) {
@@ -541,7 +543,9 @@ export default function LiveChat() {
     recModeRef.current = "send";
     try {
       recorderRef.current.stop();
-    } catch {}
+    } catch (error) {
+  console.error("Failed to stop recording:", error);
+}
   }
 
   function cancelRecording() {
@@ -549,7 +553,9 @@ export default function LiveChat() {
     recModeRef.current = "cancel";
     try {
       recorderRef.current.stop();
-    } catch {}
+    } catch (error) {
+  console.error("Failed to cancel recording:", error);
+}
   }
 
   useEffect(() => {
@@ -673,7 +679,9 @@ export default function LiveChat() {
       clearInterval(recTimerRef.current);
       try {
         socketRef.current?.disconnect();
-      } catch {}
+      } catch (error) {
+  console.error("Failed to disconnect socket:", error);
+}
     };
   }, [authLoading, sessionReady]);
 

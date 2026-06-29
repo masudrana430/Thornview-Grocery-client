@@ -1,5 +1,5 @@
-import React, { use } from 'react';
-import { AuthContext } from './AuthProvider';
+import React from 'react';
+import { useAuth } from "../hooks/useAuth";
 import { Navigate } from 'react-router';
 import LoadingSpinnercopy from '../Components/LoadingSpinnercopy';
 // import LoadingSpinner from '../Components/LoadingSpinner';
@@ -7,7 +7,7 @@ import LoadingSpinnercopy from '../Components/LoadingSpinnercopy';
 const PrivatRoute = ({ children }) => {
     // if user is not authenticated, you can redirect to login page
     //if user exists, then allow to visit the route(return children)
-    const { user , loading } = use(AuthContext);
+    const { user , loading } = useAuth();
     // console.log('from private route', user);
     if (loading){
         return <div className='p-6'> <LoadingSpinnercopy /></div>;

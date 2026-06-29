@@ -51,8 +51,9 @@ async function request(path, options = {}, _retry = false) {
     try {
       await refreshAccessToken();
       return request(path, options, true);
-    } catch (e) {
-      // refresh failed => fallthrough to error below
+    } catch (error) {
+      console.error("API request failed:", error);
+      return null;
     }
   }
 
