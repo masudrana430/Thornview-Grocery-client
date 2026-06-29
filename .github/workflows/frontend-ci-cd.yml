@@ -1,3 +1,4 @@
+```yaml
 name: THORNVIEW Frontend CI/CD
 
 on:
@@ -27,17 +28,17 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-  VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
-  VITE_STRIPE_PUBLISHABLE_KEY: ${{ vars.VITE_STRIPE_PUBLISHABLE_KEY }}
-  VITE_IMGBB_KEY: ${{ vars.VITE_IMGBB_KEY }}
-  VITE_GOOGLE_MAPS_KEY: ${{ vars.VITE_GOOGLE_MAPS_KEY }}
+      VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+      VITE_STRIPE_PUBLISHABLE_KEY: ${{ vars.VITE_STRIPE_PUBLISHABLE_KEY }}
+      VITE_IMGBB_KEY: ${{ vars.VITE_IMGBB_KEY }}
+      VITE_GOOGLE_MAPS_KEY: ${{ vars.VITE_GOOGLE_MAPS_KEY }}
 
-  VITE_apiKey: ${{ vars.VITE_apiKey }}
-  VITE_authDomain: ${{ vars.VITE_authDomain }}
-  VITE_projectId: ${{ vars.VITE_projectId }}
-  VITE_storageBucket: ${{ vars.VITE_storageBucket }}
-  VITE_messagingSenderId: ${{ vars.VITE_messagingSenderId }}
-  VITE_appId: ${{ vars.VITE_appId }}
+      VITE_apiKey: ${{ vars.VITE_apiKey }}
+      VITE_authDomain: ${{ vars.VITE_authDomain }}
+      VITE_projectId: ${{ vars.VITE_projectId }}
+      VITE_storageBucket: ${{ vars.VITE_storageBucket }}
+      VITE_messagingSenderId: ${{ vars.VITE_messagingSenderId }}
+      VITE_appId: ${{ vars.VITE_appId }}
 
     steps:
       - name: Checkout repository
@@ -55,6 +56,36 @@ jobs:
 
       - name: Run ESLint
         run: npm run lint
+
+      - name: Validate production variables
+        shell: bash
+        run: |
+          if [ -z "$VITE_API_BASE_URL" ]; then
+            echo "Missing repository variable: VITE_API_BASE_URL"
+            exit 1
+          fi
+
+          if [ -z "$VITE_STRIPE_PUBLISHABLE_KEY" ]; then
+            echo "Missing repository variable: VITE_STRIPE_PUBLISHABLE_KEY"
+            exit 1
+          fi
+
+          if [ -z "$VITE_apiKey" ]; then
+            echo "Missing repository variable: VITE_apiKey"
+            exit 1
+          fi
+
+          if [ -z "$VITE_projectId" ]; then
+            echo "Missing repository variable: VITE_projectId"
+            exit 1
+          fi
+
+          if [[ "$VITE_API_BASE_URL" != https://* ]]; then
+            echo "VITE_API_BASE_URL must use HTTPS"
+            exit 1
+          fi
+
+          echo "Required production variables are configured."
 
       - name: Build Vite application
         run: npm run build
@@ -111,11 +142,14 @@ jobs:
             exit 1
           fi
 
+          echo "Verified artifact is ready for deployment."
+
       - name: Deploy to Firebase Hosting
-  uses: FirebaseExtended/action-hosting-deploy@v0
-  with:
-    firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_THOMVIEW_GROCERY }}
-    projectId: thomview-grocery
-    target: production
-    channelId: live
-    entryPoint: .
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_THOMVIEW_GROCERY }}
+          projectId: thomview-grocery
+          target: production
+          channelId: live
+          entryPoint: .
+```
