@@ -1,149 +1,145 @@
 name: THORNVIEW Frontend CI/CD
 
-on:
-pull_request:
-branches:
-- main
+"on":
+  pull_request:
+    branches:
+      - main
 
-push:
-branches:
-- main
+  push:
+    branches:
+      - main
 
-workflow_dispatch:
+  workflow_dispatch: {}
 
 concurrency:
-group: thornview-frontend-${{ github.workflow }}-${{ github.ref }}
-cancel-in-progress: true
+  group: thornview-frontend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
-contents: read
+  contents: read
 
 jobs:
-frontend-ci:
-name: Lint and Build Frontend
-runs-on: ubuntu-latest
+  frontend-ci:
+    name: Lint and Build Frontend
+    runs-on: ubuntu-latest
 
+    env:
+      VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+      VITE_STRIPE_PUBLISHABLE_KEY: ${{ vars.VITE_STRIPE_PUBLISHABLE_KEY }}
+      VITE_IMGBB_KEY: ${{ vars.VITE_IMGBB_KEY }}
+      VITE_GOOGLE_MAPS_KEY: ${{ vars.VITE_GOOGLE_MAPS_KEY }}
+      VITE_apiKey: ${{ vars.VITE_apiKey }}
+      VITE_authDomain: ${{ vars.VITE_authDomain }}
+      VITE_projectId: ${{ vars.VITE_projectId }}
+      VITE_storageBucket: ${{ vars.VITE_storageBucket }}
+      VITE_messagingSenderId: ${{ vars.VITE_messagingSenderId }}
+      VITE_appId: ${{ vars.VITE_appId }}
 
-env:
-  VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
-  VITE_STRIPE_PUBLISHABLE_KEY: ${{ vars.VITE_STRIPE_PUBLISHABLE_KEY }}
-  VITE_IMGBB_KEY: ${{ vars.VITE_IMGBB_KEY }}
-  VITE_GOOGLE_MAPS_KEY: ${{ vars.VITE_GOOGLE_MAPS_KEY }}
-  VITE_apiKey: ${{ vars.VITE_apiKey }}
-  VITE_authDomain: ${{ vars.VITE_authDomain }}
-  VITE_projectId: ${{ vars.VITE_projectId }}
-  VITE_storageBucket: ${{ vars.VITE_storageBucket }}
-  VITE_messagingSenderId: ${{ vars.VITE_messagingSenderId }}
-  VITE_appId: ${{ vars.VITE_appId }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: package-lock.json
 
-  - name: Set up Node.js
-    uses: actions/setup-node@v4
-    with:
-      node-version-file: .nvmrc
-      cache: npm
-      cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: npm ci
 
-  - name: Install dependencies
-    run: npm ci
+      - name: Run ESLint
+        run: npm run lint
 
-  - name: Run ESLint
-    run: npm run lint
+      - name: Validate production variables
+        shell: bash
+        run: |
+          if [ -z "$VITE_API_BASE_URL" ]; then
+            echo "Missing repository variable: VITE_API_BASE_URL"
+            exit 1
+          fi
 
-  - name: Validate production variables
-    shell: bash
-    run: |
-      if [ -z "$VITE_API_BASE_URL" ]; then
-        echo "Missing repository variable: VITE_API_BASE_URL"
-        exit 1
-      fi
+          if [ -z "$VITE_STRIPE_PUBLISHABLE_KEY" ]; then
+            echo "Missing repository variable: VITE_STRIPE_PUBLISHABLE_KEY"
+            exit 1
+          fi
 
-      if [ -z "$VITE_STRIPE_PUBLISHABLE_KEY" ]; then
-        echo "Missing repository variable: VITE_STRIPE_PUBLISHABLE_KEY"
-        exit 1
-      fi
+          if [ -z "$VITE_apiKey" ]; then
+            echo "Missing repository variable: VITE_apiKey"
+            exit 1
+          fi
 
-      if [ -z "$VITE_apiKey" ]; then
-        echo "Missing repository variable: VITE_apiKey"
-        exit 1
-      fi
+          if [ -z "$VITE_projectId" ]; then
+            echo "Missing repository variable: VITE_projectId"
+            exit 1
+          fi
 
-      if [ -z "$VITE_projectId" ]; then
-        echo "Missing repository variable: VITE_projectId"
-        exit 1
-      fi
+          if [[ "$VITE_API_BASE_URL" != https://* ]]; then
+            echo "VITE_API_BASE_URL must use HTTPS"
+            exit 1
+          fi
 
-      if [[ "$VITE_API_BASE_URL" != https://* ]]; then
-        echo "VITE_API_BASE_URL must use HTTPS"
-        exit 1
-      fi
+          echo "Required production variables are configured."
 
-      echo "Required production variables are configured."
+      - name: Build Vite application
+        run: npm run build
 
-  - name: Build Vite application
-    run: npm run build
+      - name: Verify production build
+        shell: bash
+        run: |
+          if [ ! -f "dist/index.html" ]; then
+            echo "Error: dist/index.html was not generated."
+            exit 1
+          fi
 
-  - name: Verify production build
-    shell: bash
-    run: |
-      if [ ! -f "dist/index.html" ]; then
-        echo "Error: dist/index.html was not generated."
-        exit 1
-      fi
+          echo "Production build verified successfully."
 
-      echo "Production build verified successfully."
+      - name: Upload verified build
+        uses: actions/upload-artifact@v4
+        with:
+          name: thornview-frontend-dist
+          path: dist
+          if-no-files-found: error
+          retention-days: 1
 
-  - name: Upload verified build
-    uses: actions/upload-artifact@v4
-    with:
-      name: thornview-frontend-dist
-      path: dist
-      if-no-files-found: error
-      retention-days: 1
+  deploy-production:
+    name: Deploy to Firebase Hosting
+    runs-on: ubuntu-latest
+    needs:
+      - frontend-ci
 
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
-deploy-production:
-name: Deploy to Firebase Hosting
-runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://thornview-grocery.web.app
 
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-needs:
-  - frontend-ci
+      - name: Download verified build
+        uses: actions/download-artifact@v4
+        with:
+          name: thornview-frontend-dist
+          path: dist
 
-if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Verify downloaded build
+        shell: bash
+        run: |
+          if [ ! -f "dist/index.html" ]; then
+            echo "Error: verified frontend artifact is missing."
+            exit 1
+          fi
 
-environment:
-  name: production
-  url: https://thornview-grocery.web.app
+          echo "Verified artifact is ready for deployment."
 
-steps:
-  - name: Checkout repository
-    uses: actions/checkout@v4
-
-  - name: Download verified build
-    uses: actions/download-artifact@v4
-    with:
-      name: thornview-frontend-dist
-      path: dist
-
-  - name: Verify downloaded build
-    shell: bash
-    run: |
-      if [ ! -f "dist/index.html" ]; then
-        echo "Error: verified frontend artifact is missing."
-        exit 1
-      fi
-
-      echo "Verified artifact is ready for deployment."
-
-  - name: Deploy to Firebase Hosting
-    uses: FirebaseExtended/action-hosting-deploy@v0
-    with:
-      firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_THOMVIEW_GROCERY }}
-      projectId: thomview-grocery
-      target: production
-      channelId: live
-      entryPoint: .
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_THOMVIEW_GROCERY }}
+          projectId: thomview-grocery
+          target: production
+          channelId: live
+          entryPoint: .
