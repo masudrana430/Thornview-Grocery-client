@@ -1,84 +1,115 @@
-import React from "react";
+import { lazy } from "react";
+
 import Container from "../../Components/Container";
+import ViewportSection from "../../Components/ViewportSection";
+
+// Above-the-fold sections: load immediately.
 import PromoMosaic from "./components/PromoMosaic";
 import BrandBannersRow from "./components/BrandBannersRow";
 import BigDealGrid from "./components/BigDealGrid";
-import ProductRail from "./components/ProductRail";
-import HeroWithRail from "./components/HeroWithRail";
-// Use the components we just added
-import RailSection from "./components/RailSection";
-import RailWithBanner from "./components/RailWithBanner";
-import DepartmentScroller from "./components/DepartmentScroller";
-import SupportBanner from "./components/SupportBanner";
+
+// Below-the-fold sections: separate JavaScript chunks.
+const ProductRail = lazy(() =>
+  import("./components/ProductRail")
+);
+
+const HeroWithRail = lazy(() =>
+  import("./components/HeroWithRail")
+);
+
+const RailSection = lazy(() =>
+  import("./components/RailSection")
+);
+
+const RailWithBanner = lazy(() =>
+  import("./components/RailWithBanner")
+);
+
+const DepartmentScroller = lazy(() =>
+  import("./components/DepartmentScroller")
+);
+
+const SupportBanner = lazy(() =>
+  import("./components/SupportBanner")
+);
 
 export default function Home() {
-  // ✅ Replace these with API data later (from /api/home)
-
-
-
-  // ---------------- Demo data (replace with API later) ----------------
-
-
-
-
-  // -------------------------------------------------------------------
-
   return (
-    <div className="bg-base-100">
+    <main className="bg-base-100">
       <Container>
-        <div className="py-5 space-y-10">
-           <PromoMosaic className="mb-10" />
+        <div className="space-y-10 py-5">
+          {/* Critical visible content */}
+          <PromoMosaic className="mb-10" />
 
-          <BrandBannersRow title="Brands for you"  />
+          <BrandBannersRow title="Brands for you" />
 
-          <BigDealGrid title="This week’s highlights"  />
+          <BigDealGrid title="This week’s highlights" />
 
-          <ProductRail
-            railKey="baby-musts"
-            
-          />
+          {/* Near-viewport progressive sections */}
+          <ViewportSection
+            minHeight={360}
+            ariaLabel="Baby must-have products"
+          >
+            <ProductRail railKey="baby-musts" />
+          </ViewportSection>
 
-          <HeroWithRail
-            sectionKey="gifts-holiday"
-          />
+          <ViewportSection
+            minHeight={480}
+            ariaLabel="Holiday gifts"
+          >
+            <HeroWithRail sectionKey="gifts-holiday" />
+          </ViewportSection>
 
-          {/* ✅ “Save it for next season” (rail + banner on right) */}
-          <RailWithBanner
-            sectionKey="save-for-season"
-          />
+          <ViewportSection
+            minHeight={420}
+            ariaLabel="Save for next season"
+          >
+            <RailWithBanner sectionKey="save-for-season" />
+          </ViewportSection>
 
-          {/* ✅ Shop by department */}
-          <DepartmentScroller
-            
-          />
+          <ViewportSection
+            minHeight={260}
+            ariaLabel="Shop by department"
+          >
+            <DepartmentScroller />
+          </ViewportSection>
 
-          {/* ✅ Trending in your area */}
-          <RailSection
-            sectionKey="weekly-flyer"
-          />
+          <ViewportSection
+            minHeight={360}
+            ariaLabel="Weekly flyer"
+          >
+            <RailSection sectionKey="weekly-flyer" />
+          </ViewportSection>
 
-          {/* ✅ Support banner */}
-          <SupportBanner />
+          <ViewportSection
+            minHeight={220}
+            ariaLabel="Customer support"
+          >
+            <SupportBanner />
+          </ViewportSection>
 
-          {/* ✅ Rollbacks-style large promo mosaic (use your existing promo grid later)
-              For now, keep this as another rail section or add your PromoMosaic here. */}
-          <RailSection
-            sectionKey="save-for-weekends"
-          />
+          <ViewportSection
+            minHeight={360}
+            ariaLabel="Weekend savings"
+          >
+            <RailSection sectionKey="save-for-weekends" />
+          </ViewportSection>
 
-          
+          <ViewportSection
+            minHeight={420}
+            ariaLabel="Beauty partner products"
+          >
+            <RailWithBanner sectionKey="beautypeak-partner" />
+          </ViewportSection>
 
-          {/* ✅ Brand partner (rail + big banner on right like your screenshot) */}
-          <RailWithBanner
-            sectionKey="beautypeak-partner"
-          />
-
-          {/* ✅ Gift cards rail */}
-          <RailSection
-            sectionKey="gift-cards"
-          />
+          <ViewportSection
+            minHeight={360}
+            ariaLabel="Gift cards"
+          >
+            <RailSection sectionKey="gift-cards" />
+          </ViewportSection>
         </div>
       </Container>
-    </div>
+    </main>
   );
 }
